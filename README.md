@@ -173,6 +173,24 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        
+        .mobile-back-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            padding: 8px;
+            margin-right: 10px;
+            cursor: pointer;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .mobile-back-btn:hover {
+            background-color: rgba(255,255,255,0.1);
         }
         
         .app-logo {
@@ -689,8 +707,34 @@
             display: none;
         }
         
+        /* Chat Loading States */
+        .chat-loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            flex-direction: column;
+            color: var(--text-light);
+        }
+        
+        .chat-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+        
+        .chat-empty i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        
         /* Responsive */
         @media (max-width: 768px) {
+            .mobile-back-btn {
+                display: block;
+            }
+            
             .sidebar {
                 width: 100%;
             }
@@ -701,10 +745,19 @@
             
             .chat-area {
                 display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 100;
+                transform: translateX(100%);
+                transition: transform 0.3s ease;
             }
             
             .chat-area.active {
                 display: flex;
+                transform: translateX(0);
             }
             
             .chat-avatar {
@@ -769,6 +822,9 @@
     <div id="app">
         <!-- Header -->
         <div class="app-header">
+            <button class="mobile-back-btn" id="mobile-back-btn" style="display: none;">
+                <i class="fas fa-arrow-left"></i>
+            </button>
             <div class="app-logo">
                 <i class="fas fa-leaf app-logo-icon"></i>
                 <div class="app-logo-text">LeafSays</div>
@@ -910,6 +966,7 @@
         const logoutBtn = document.getElementById('logout-btn');
         const addFriendBtn = document.getElementById('add-friend-btn');
         const settingsBtn = document.getElementById('settings-btn');
+        const mobileBackBtn = document.getElementById('mobile-back-btn');
         const addFriendModal = document.getElementById('add-friend-modal');
         const profileModal = document.getElementById('profile-modal');
         const closeModals = document.querySelectorAll('.close-modal');
@@ -994,6 +1051,7 @@
         logoutBtn.addEventListener('click', handleLogout);
         addFriendBtn.addEventListener('click', () => addFriendModal.style.display = 'flex');
         settingsBtn.addEventListener('click', () => profileModal.style.display = 'flex');
+        mobileBackBtn.addEventListener('click', handleMobileBack);
         addFriendConfirm.addEventListener('click', handleAddFriend);
         sendBtn.addEventListener('click', sendMessage);
         attachBtn.addEventListener('click', () => imageInput.click());
@@ -1065,6 +1123,12 @@
             if (auth) {
                 auth.signOut();
             }
+        }
+
+        function handleMobileBack() {
+            document.querySelector('.sidebar').style.display = 'flex';
+            document.querySelector('.chat-area').classList.remove('active');
+            mobileBackBtn.style.display = 'none';
         }
 
         function setupUserProfile() {
@@ -1150,13 +1214,13 @@
         function loadChats() {
             if (!db || !currentUser) return;
             
-            // This would load actual chat conversations
-            // For demo, we'll use contacts as chats
+            // Load actual chat conversations from Firestore
             db.collection('users').doc(currentUser.uid).collection('contacts')
                 .onSnapshot((snapshot) => {
                     chats = [];
                     snapshot.forEach((doc) => {
                         const contact = doc.data();
+                        // For demo, we'll create a default chat
                         chats.push({
                             ...contact,
                             lastMessage: 'Halo! Mulai percakapan...',
@@ -1280,6 +1344,8 @@
         }
 
         function selectChat(chat) {
+            console.log('Chat selected:', chat);
+            
             selectedChat = chat;
             chatHeaderName.textContent = chat.displayName || 'Friend';
             chatHeaderAvatar.textContent = chat.displayName ? chat.displayName.charAt(0).toUpperCase() : 'F';
@@ -1291,6 +1357,14 @@
             messageInput.disabled = false;
             sendBtn.disabled = false;
             messageInput.placeholder = "Ketik pesan...";
+            messageInput.focus();
+            
+            // Update mobile view
+            if (window.innerWidth <= 768) {
+                document.querySelector('.sidebar').style.display = 'none';
+                document.querySelector('.chat-area').classList.add('active');
+                mobileBackBtn.style.display = 'block';
+            }
             
             // Reload lists to update active state
             if (currentTab === 'chats') {
@@ -1303,24 +1377,61 @@
         }
 
         function loadMessages(contactId) {
-            if (!db || !currentUser) return;
+            if (!db || !currentUser || !contactId) {
+                console.error('Cannot load messages: missing db, user, or contactId');
+                return;
+            }
             
-            chatMessages.innerHTML = '';
+            console.log('Loading messages for:', contactId);
+            
+            // Clear chat messages dan tampilkan loading
+            chatMessages.innerHTML = `
+                <div class="chat-loading">
+                    <div class="loading-spinner"></div>
+                    <p>Memuat percakapan...</p>
+                </div>
+            `;
             
             const chatId = [currentUser.uid, contactId].sort().join('_');
+            console.log('Chat ID:', chatId);
             
+            // Listen untuk messages real-time
             db.collection('chats').doc(chatId).collection('messages')
                 .orderBy('timestamp', 'asc')
                 .onSnapshot((snapshot) => {
+                    console.log('Messages snapshot:', snapshot.size, 'messages');
+                    
                     chatMessages.innerHTML = '';
+                    
+                    if (snapshot.empty) {
+                        // Jika belum ada pesan, tampilkan pesan default
+                        chatMessages.innerHTML = `
+                            <div class="chat-empty">
+                                <i class="fas fa-comments"></i>
+                                <h3 style="margin-bottom: 10px;">Mulai Percakapan</h3>
+                                <p>Kirim pesan pertama untuk memulai chat dengan ${selectedChat?.displayName || 'teman'}!</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
                     snapshot.forEach((doc) => {
                         const message = doc.data();
                         addMessageToChat(message);
                     });
                     
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    // Scroll ke bottom
+                    setTimeout(() => {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }, 100);
                 }, (error) => {
                     console.error('Error loading messages:', error);
+                    chatMessages.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #c62828;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Gagal memuat pesan. Silakan refresh halaman.</p>
+                        </div>
+                    `;
                 });
         }
 
@@ -1349,24 +1460,35 @@
         function sendMessage() {
             const messageText = messageInput.value.trim();
             if (!messageText || !selectedChat || !db) {
+                alert('Pilih chat terlebih dahulu dan ketik pesan');
                 return;
             }
+            
+            console.log('Sending message to:', selectedChat.userId);
             
             const timestamp = new Date();
             const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
             
+            // Tambahkan pesan ke Firestore
             db.collection('chats').doc(chatId).collection('messages').add({
                 text: messageText,
                 senderId: currentUser.uid,
-                senderName: currentUser.displayName,
+                senderName: currentUser.displayName || 'User',
                 timestamp: timestamp,
                 type: 'text',
                 read: false
             })
             .then(() => {
+                console.log('Message sent successfully');
                 messageInput.value = '';
-                // Update last message in chat list
+                
+                // Update last message di chat list
                 updateLastMessage(selectedChat.userId, messageText, timestamp);
+                
+                // Auto scroll ke bottom
+                setTimeout(() => {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 100);
             })
             .catch((error) => {
                 console.error('Error sending message:', error);
@@ -1560,6 +1682,19 @@
         function openImage(url) {
             window.open(url, '_blank');
         }
+
+        // Debug helper untuk test chat functionality
+        function testChatFunctionality() {
+            console.log('=== TEST CHAT FUNCTIONALITY ===');
+            console.log('Current User:', currentUser);
+            console.log('Selected Chat:', selectedChat);
+            console.log('Contacts:', contacts);
+            console.log('Chats:', chats);
+            console.log('Firebase DB:', db ? 'Connected' : 'Not connected');
+        }
+
+        // Expose test function ke global scope untuk debugging
+        window.testChat = testChatFunctionality;
 
         // Auth state observer
         if (auth) {
