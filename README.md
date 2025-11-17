@@ -8,6 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <style>
         :root {
             --primary-green: #128C7E;
@@ -15,6 +16,8 @@
             --dark-green: #075E54;
             --primary-blue: #34B7F1;
             --light-blue: #6BCFFF;
+            --yellow-color: #FFD700;
+            --light-yellow: #FFF9C4;
             --chat-bg: #E5DDD5;
             --message-sent: #DCF8C6;
             --message-received: #FFFFFF;
@@ -36,6 +39,47 @@
             height: 100vh;
             display: flex;
             flex-direction: column;
+        }
+        
+        /* Loading */
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Error Message */
+        .error-message {
+            display: none;
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            border: 1px solid #ffcdd2;
         }
         
         /* Login Page */
@@ -83,11 +127,13 @@
         .login-container h1 {
             color: var(--primary-green);
             margin-bottom: 10px;
+            font-size: 24px;
         }
         
         .login-container p {
             color: var(--text-light);
             margin-bottom: 30px;
+            line-height: 1.5;
         }
         
         #login-btn {
@@ -104,6 +150,7 @@
             gap: 10px;
             margin: 0 auto;
             transition: background-color 0.3s;
+            width: 100%;
         }
         
         #login-btn:hover {
@@ -159,10 +206,14 @@
             justify-content: center;
             font-weight: bold;
             color: white;
+            border: 2px solid white;
+            background-size: cover;
+            background-position: center;
         }
         
         .user-details h3 {
             font-size: 16px;
+            margin-bottom: 2px;
         }
         
         .user-details p {
@@ -178,6 +229,13 @@
         .header-actions i {
             cursor: pointer;
             font-size: 18px;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .header-actions i:hover {
+            background-color: rgba(255,255,255,0.1);
         }
         
         /* Main Content */
@@ -194,6 +252,7 @@
             border-right: 1px solid var(--border-light);
             display: flex;
             flex-direction: column;
+            min-width: 300px;
         }
         
         .sidebar-header {
@@ -220,6 +279,7 @@
             background: transparent;
             width: 100%;
             outline: none;
+            font-size: 14px;
         }
         
         .sidebar-tabs {
@@ -234,6 +294,7 @@
             cursor: pointer;
             font-weight: 500;
             color: var(--text-light);
+            transition: all 0.2s;
         }
         
         .tab.active {
@@ -241,52 +302,83 @@
             border-bottom: 2px solid var(--primary-green);
         }
         
+        .tab:hover {
+            background-color: #f9f9f9;
+        }
+        
         .contacts-list {
             flex: 1;
             overflow-y: auto;
         }
         
-        .contact-item {
+        /* Chat List Item */
+        .chat-item {
             display: flex;
             padding: 15px;
             border-bottom: 1px solid var(--border-light);
             cursor: pointer;
             transition: background-color 0.2s;
+            background: linear-gradient(135deg, var(--light-blue), var(--yellow-color));
+            margin: 5px;
+            border-radius: 10px;
         }
         
-        .contact-item:hover {
-            background-color: #f5f5f5;
+        .chat-item:hover {
+            background: linear-gradient(135deg, var(--primary-blue), var(--yellow-color));
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         
-        .contact-item.active {
-            background-color: #e9f5eb;
+        .chat-item.active {
+            background: linear-gradient(135deg, var(--primary-blue), var(--yellow-color));
+            border: 2px solid var(--primary-green);
         }
         
-        .contact-avatar {
+        .chat-avatar {
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            background-color: var(--light-blue);
+            background-color: white;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            color: white;
+            color: var(--primary-blue);
             margin-right: 15px;
+            font-size: 18px;
+            border: 2px solid white;
+            background-size: cover;
+            background-position: center;
         }
         
-        .contact-info {
+        .chat-info {
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         
-        .contact-name {
-            font-weight: 500;
+        .chat-name {
+            font-weight: 600;
             margin-bottom: 5px;
+            font-size: 16px;
+            color: var(--text-dark);
         }
         
-        .contact-status {
+        .chat-last-message {
             font-size: 13px;
-            color: var(--text-light);
+            color: var(--text-dark);
+            opacity: 0.8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .chat-time {
+            font-size: 11px;
+            color: var(--text-dark);
+            opacity: 0.6;
+            margin-top: 2px;
         }
         
         /* Chat Area */
@@ -317,6 +409,9 @@
             font-weight: bold;
             color: white;
             margin-right: 15px;
+            border: 2px solid var(--light-blue);
+            background-size: cover;
+            background-position: center;
         }
         
         .chat-header-info {
@@ -325,6 +420,7 @@
         
         .chat-header-name {
             font-weight: 500;
+            font-size: 16px;
         }
         
         .chat-header-status {
@@ -347,6 +443,7 @@
             border-radius: 7.5px;
             position: relative;
             word-wrap: break-word;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         
         .message-sent {
@@ -361,6 +458,13 @@
             border-top-left-radius: 0;
         }
         
+        .message-image {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 5px;
+            cursor: pointer;
+        }
+        
         .message-time {
             font-size: 11px;
             color: var(--text-light);
@@ -373,15 +477,22 @@
             padding: 15px;
             background-color: var(--sidebar-bg);
             align-items: center;
+            border-top: 1px solid var(--border-light);
         }
         
         .chat-input {
             flex: 1;
             padding: 12px 15px;
-            border: none;
+            border: 1px solid var(--border-light);
             border-radius: 20px;
             outline: none;
             margin: 0 10px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .chat-input:focus {
+            border-color: var(--primary-green);
         }
         
         .chat-action-btn {
@@ -396,6 +507,7 @@
             cursor: pointer;
             color: var(--text-light);
             font-size: 18px;
+            transition: background-color 0.2s;
         }
         
         .chat-action-btn:hover {
@@ -411,7 +523,12 @@
             background-color: var(--dark-green);
         }
         
-        /* Add Friend Modal */
+        /* File Input */
+        .file-input {
+            display: none;
+        }
+        
+        /* Modals */
         .modal {
             display: none;
             position: fixed;
@@ -432,6 +549,18 @@
             max-width: 400px;
             padding: 20px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            animation: modalAppear 0.3s ease-out;
+        }
+        
+        @keyframes modalAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
         
         .modal-header {
@@ -439,11 +568,14 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-light);
         }
         
         .modal-title {
             font-weight: 500;
             color: var(--text-dark);
+            font-size: 18px;
         }
         
         .close-modal {
@@ -452,6 +584,13 @@
             font-size: 20px;
             cursor: pointer;
             color: var(--text-light);
+            padding: 5px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .close-modal:hover {
+            background-color: #f0f0f0;
         }
         
         .modal-body {
@@ -464,20 +603,59 @@
             border: 1px solid var(--border-light);
             border-radius: 5px;
             margin-bottom: 15px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .modal-input:focus {
+            border-color: var(--primary-green);
+            outline: none;
         }
         
         .modal-btn {
             background-color: var(--primary-green);
             color: white;
             border: none;
-            padding: 10px 15px;
+            padding: 12px 15px;
             border-radius: 5px;
             cursor: pointer;
             width: 100%;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
         }
         
         .modal-btn:hover {
             background-color: var(--dark-green);
+        }
+        
+        /* Profile Settings */
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: var(--light-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            margin: 0 auto 20px;
+            font-size: 36px;
+            cursor: pointer;
+            background-size: cover;
+            background-position: center;
+            border: 3px solid var(--primary-green);
+        }
+        
+        .profile-avatar:hover::after {
+            content: 'Ganti Foto';
+            position: absolute;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
         }
         
         /* User ID Display */
@@ -485,7 +663,7 @@
             background-color: #f0f8ff;
             border: 1px dashed var(--primary-blue);
             border-radius: 5px;
-            padding: 10px;
+            padding: 15px;
             margin-top: 15px;
             text-align: center;
             font-size: 14px;
@@ -495,30 +673,76 @@
             font-weight: bold;
             color: var(--primary-blue);
             margin-top: 5px;
+            font-size: 16px;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid var(--light-blue);
+        }
+        
+        /* Image Preview */
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            margin: 10px 0;
+            border-radius: 10px;
+            display: none;
         }
         
         /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
                 width: 100%;
-                display: none;
+            }
+            
+            .app-content {
+                flex-direction: column;
             }
             
             .chat-area {
                 display: none;
             }
             
-            .sidebar.active {
-                display: flex;
-            }
-            
             .chat-area.active {
                 display: flex;
             }
+            
+            .chat-avatar {
+                width: 45px;
+                height: 45px;
+            }
+            
+            .chat-name {
+                font-size: 15px;
+            }
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
         }
     </style>
 </head>
 <body>
+    <!-- Loading Indicator -->
+    <div class="loading" id="loading">
+        <div class="loading-spinner"></div>
+        <p style="margin-top: 15px; color: var(--primary-green);">Menyiapkan LeafSays...</p>
+    </div>
+
     <!-- Login Page -->
     <div id="login-page">
         <div class="login-container">
@@ -528,6 +752,13 @@
             </div>
             <h1>Selamat Datang di LeafSays</h1>
             <p>Login dengan akun Google untuk mulai chat real-time</p>
+            
+            <!-- Error Message -->
+            <div class="error-message" id="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="error-text">Terjadi kesalahan</span>
+            </div>
+            
             <button id="login-btn">
                 <i class="fab fa-google"></i> Login dengan Google
             </button>
@@ -550,8 +781,9 @@
                 </div>
             </div>
             <div class="header-actions">
-                <i class="fas fa-user-plus" id="add-friend-btn"></i>
-                <i class="fas fa-sign-out-alt" id="logout-btn"></i>
+                <i class="fas fa-user-plus" id="add-friend-btn" title="Tambah Teman"></i>
+                <i class="fas fa-cog" id="settings-btn" title="Pengaturan"></i>
+                <i class="fas fa-sign-out-alt" id="logout-btn" title="Logout"></i>
             </div>
         </div>
         
@@ -562,17 +794,17 @@
                 <div class="sidebar-header">
                     <div class="search-container">
                         <i class="fas fa-search"></i>
-                        <input type="text" placeholder="Cari atau mulai chat baru">
+                        <input type="text" placeholder="Cari atau mulai chat baru" id="search-contacts">
                     </div>
                 </div>
                 
                 <div class="sidebar-tabs">
-                    <div class="tab active">Chats</div>
-                    <div class="tab">Kontak</div>
+                    <div class="tab active" id="tab-chats">Chats</div>
+                    <div class="tab" id="tab-contacts">Kontak</div>
                 </div>
                 
                 <div class="contacts-list" id="contacts-list">
-                    <!-- Contacts will be loaded here -->
+                    <!-- Chat list will be loaded here -->
                 </div>
             </div>
             
@@ -582,25 +814,25 @@
                     <div class="chat-header-avatar" id="chat-header-avatar">L</div>
                     <div class="chat-header-info">
                         <div class="chat-header-name" id="chat-header-name">LeafSays Chat</div>
-                        <div class="chat-header-status" id="chat-header-status">Pilih kontak untuk memulai percakapan</div>
+                        <div class="chat-header-status" id="chat-header-status">Pilih chat untuk memulai percakapan</div>
                     </div>
                 </div>
                 
                 <div class="chat-messages" id="chat-messages">
-                    <div class="welcome-message">
-                        <div class="message message-received">
-                            <div class="message-text">Selamat datang di LeafSays! Tambahkan teman dengan User ID mereka untuk memulai percakapan.</div>
-                            <div class="message-time">Sekarang</div>
-                        </div>
+                    <div class="message message-received">
+                        <div class="message-text">Selamat datang di LeafSays! 🌿</div>
+                        <div class="message-text" style="margin-top: 5px;">Pilih chat dari daftar untuk memulai percakapan real-time.</div>
+                        <div class="message-time">Sekarang</div>
                     </div>
                 </div>
                 
                 <div class="chat-input-container">
-                    <button class="chat-action-btn">
+                    <button class="chat-action-btn" id="attach-btn">
                         <i class="fas fa-paperclip"></i>
                     </button>
-                    <input type="text" class="chat-input" placeholder="Ketik pesan..." id="message-input">
-                    <button class="chat-action-btn send-btn" id="send-btn">
+                    <input type="file" class="file-input" id="image-input" accept="image/*">
+                    <input type="text" class="chat-input" placeholder="Pilih chat terlebih dahulu" id="message-input" disabled>
+                    <button class="chat-action-btn send-btn" id="send-btn" disabled>
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
@@ -629,30 +861,58 @@
         </div>
     </div>
 
-    <script>
-        // Firebase configuration - GANTI DENGAN KONFIGURASI FIREBASE
-const firebaseConfig = {
-    apiKey: "AIzaSyBjPJj73wSIg_0ffEpTS4Z7ecBWJs6xRvI",
-    authDomain: "leafsays-a8c84.firebaseapp.com",
-    projectId: "leafsays-a8c84",
-    storageBucket: "leafsays-a8c84.firebasestorage.app",
-    messagingSenderId: "863298565588",
-    appId: "1:863298565588:web:f379e717f118c9ed41d241"
-};
+    <!-- Profile Settings Modal -->
+    <div class="modal" id="profile-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Pengaturan Profil</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-avatar" id="profile-avatar-preview">
+                    U
+                </div>
+                <input type="file" id="avatar-input" accept="image/*" style="display: none;">
+                <button class="modal-btn" onclick="document.getElementById('avatar-input').click()">
+                    <i class="fas fa-camera"></i> Ganti Foto Profil
+                </button>
+                
+                <div style="margin: 20px 0;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">Nama Panggilan:</label>
+                    <input type="text" class="modal-input" id="profile-name-input" placeholder="Masukkan nama panggilan">
+                </div>
+                
+                <button class="modal-btn" id="save-profile-btn">
+                    <i class="fas fa-save"></i> Simpan Perubahan
+                </button>
+            </div>
+        </div>
+    </div>
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBjPJj73wSIg_0ffEpTS4Z7ecBWJs6xRvI",
+            authDomain: "leafsays-a8c84.firebaseapp.com",
+            projectId: "leafsays-a8c84",
+            storageBucket: "leafsays-a8c84.firebasestorage.app",
+            messagingSenderId: "863298565588",
+            appId: "1:863298565588:web:f379e717f118c9ed41d241"
+        };
 
         // DOM Elements
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
         const loginPage = document.getElementById('login-page');
         const app = document.getElementById('app');
         const loginBtn = document.getElementById('login-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const addFriendBtn = document.getElementById('add-friend-btn');
+        const settingsBtn = document.getElementById('settings-btn');
         const addFriendModal = document.getElementById('add-friend-modal');
-        const closeModal = document.querySelector('.close-modal');
+        const profileModal = document.getElementById('profile-modal');
+        const closeModals = document.querySelectorAll('.close-modal');
         const addFriendConfirm = document.getElementById('add-friend-confirm');
         const friendIdInput = document.getElementById('friend-id-input');
         const userIdDisplay = document.getElementById('user-id-display');
@@ -662,103 +922,197 @@ const firebaseConfig = {
         const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
+        const attachBtn = document.getElementById('attach-btn');
+        const imageInput = document.getElementById('image-input');
         const chatHeaderName = document.getElementById('chat-header-name');
         const chatHeaderAvatar = document.getElementById('chat-header-avatar');
         const chatHeaderStatus = document.getElementById('chat-header-status');
+        const profileAvatarPreview = document.getElementById('profile-avatar-preview');
+        const avatarInput = document.getElementById('avatar-input');
+        const profileNameInput = document.getElementById('profile-name-input');
+        const saveProfileBtn = document.getElementById('save-profile-btn');
+        const searchContacts = document.getElementById('search-contacts');
+        const tabChats = document.getElementById('tab-chats');
+        const tabContacts = document.getElementById('tab-contacts');
 
         // Global variables
         let currentUser = null;
-        let selectedContact = null;
+        let selectedChat = null;
         let contacts = [];
+        let chats = [];
         let userData = null;
+        let auth, db, storage;
+        let currentTab = 'chats';
 
-        // Google Login
-        loginBtn.addEventListener('click', () => {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider)
-                .then((result) => {
-                    // User signed in
-                    currentUser = result.user;
-                    setupUserProfile();
-                    loginPage.style.display = 'none';
-                    app.style.display = 'flex';
-                    
-                    // Generate and save user ID if not exists
-                    generateUserId();
-                    
-                    // Load contacts
-                    loadContacts();
-                })
-                .catch((error) => {
-                    console.error('Login error:', error);
-                    alert('Login gagal. Silakan coba lagi.');
-                });
+        // Initialize Firebase
+        function initializeFirebase() {
+            try {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                auth = firebase.auth();
+                db = firebase.firestore();
+                storage = firebase.storage();
+                
+                console.log('Firebase initialized successfully');
+                hideError();
+                return true;
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                showError('Gagal menginisialisasi Firebase: ' + error.message);
+                return false;
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loading.style.display = 'flex';
+            
+            setTimeout(() => {
+                if (initializeFirebase()) {
+                    loading.style.display = 'none';
+                    loginPage.style.display = 'flex';
+                } else {
+                    loading.style.display = 'none';
+                }
+            }, 1000);
         });
 
-        // Logout
-        logoutBtn.addEventListener('click', () => {
-            auth.signOut().then(() => {
-                app.style.display = 'none';
-                loginPage.style.display = 'flex';
-                currentUser = null;
-                selectedContact = null;
-                contacts = [];
-                contactsList.innerHTML = '';
-                chatMessages.innerHTML = '';
+        // Event Listeners
+        loginBtn.addEventListener('click', handleLogin);
+        logoutBtn.addEventListener('click', handleLogout);
+        addFriendBtn.addEventListener('click', () => addFriendModal.style.display = 'flex');
+        settingsBtn.addEventListener('click', () => profileModal.style.display = 'flex');
+        addFriendConfirm.addEventListener('click', handleAddFriend);
+        sendBtn.addEventListener('click', sendMessage);
+        attachBtn.addEventListener('click', () => imageInput.click());
+        imageInput.addEventListener('change', handleImageUpload);
+        saveProfileBtn.addEventListener('click', saveProfile);
+        searchContacts.addEventListener('input', filterContacts);
+        
+        tabChats.addEventListener('click', () => switchTab('chats'));
+        tabContacts.addEventListener('click', () => switchTab('contacts'));
+
+        // Close modals
+        closeModals.forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('.modal').style.display = 'none';
             });
         });
 
-        // Open add friend modal
-        addFriendBtn.addEventListener('click', () => {
-            addFriendModal.style.display = 'flex';
-        });
-
-        // Close modal
-        closeModal.addEventListener('click', () => {
-            addFriendModal.style.display = 'none';
-        });
-
-        // Add friend
-        addFriendConfirm.addEventListener('click', () => {
-            const friendId = friendIdInput.value.trim();
-            if (friendId) {
-                addFriend(friendId);
-                friendIdInput.value = '';
-                addFriendModal.style.display = 'none';
-            } else {
-                alert('Masukkan User ID yang valid');
+        // Close modals when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
             }
         });
 
-        // Send message
-        sendBtn.addEventListener('click', sendMessage);
+        // Message input enter key
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendMessage();
             }
         });
 
-        // Setup user profile
-        function setupUserProfile() {
-            userAvatar.textContent = currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'U';
-            userName.textContent = currentUser.displayName || 'User';
+        // Avatar change
+        avatarInput.addEventListener('change', handleAvatarChange);
+
+        // Functions
+        function handleLogin() {
+            if (!auth) {
+                showError('Firebase belum terinisialisasi. Refresh halaman.');
+                return;
+            }
+
+            loading.style.display = 'flex';
+            hideError();
+            
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('profile');
+            provider.addScope('email');
+            
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    currentUser = result.user;
+                    setupUserProfile();
+                    loading.style.display = 'none';
+                    loginPage.style.display = 'none';
+                    app.style.display = 'flex';
+                    
+                    generateUserId();
+                    loadContacts();
+                    loadChats();
+                })
+                .catch((error) => {
+                    loading.style.display = 'none';
+                    console.error('Login error:', error);
+                    showError('Login gagal: ' + error.message);
+                });
         }
 
-        // Generate user ID
-        function generateUserId() {
-            // Check if user already has an ID
+        function handleLogout() {
+            if (auth) {
+                auth.signOut();
+            }
+        }
+
+        function setupUserProfile() {
+            if (currentUser && currentUser.displayName) {
+                userAvatar.textContent = currentUser.displayName.charAt(0).toUpperCase();
+                userName.textContent = currentUser.displayName;
+                profileNameInput.value = currentUser.displayName;
+            }
+            
+            // Load user profile data
+            loadUserProfile();
+        }
+
+        function loadUserProfile() {
+            if (!db || !currentUser) return;
+            
             db.collection('users').doc(currentUser.uid).get()
                 .then((doc) => {
                     if (doc.exists) {
-                        // User already has an ID
+                        const userData = doc.data();
+                        if (userData.photoURL) {
+                            userAvatar.style.backgroundImage = `url(${userData.photoURL})`;
+                            userAvatar.textContent = '';
+                            profileAvatarPreview.style.backgroundImage = `url(${userData.photoURL})`;
+                            profileAvatarPreview.textContent = '';
+                        }
+                        if (userData.displayName) {
+                            profileNameInput.value = userData.displayName;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading user profile:', error);
+                });
+        }
+
+        function generateUserId() {
+            if (!db || !currentUser) return;
+            
+            db.collection('users').doc(currentUser.uid).get()
+                .then((doc) => {
+                    if (doc.exists) {
                         userData = doc.data();
                         userIdDisplay.textContent = userData.userId;
                     } else {
-                        // Generate new user ID
                         const userId = 'USER_' + Math.random().toString(36).substr(2, 9).toUpperCase();
                         userIdDisplay.textContent = userId;
                         
-                        // Save to Firestore
                         userData = {
                             uid: currentUser.uid,
                             email: currentUser.email,
@@ -777,9 +1131,9 @@ const firebaseConfig = {
                 });
         }
 
-        // Load contacts
         function loadContacts() {
-            // Load user's contacts from Firestore
+            if (!db || !currentUser) return;
+            
             db.collection('users').doc(currentUser.uid).collection('contacts')
                 .onSnapshot((snapshot) => {
                     contacts = [];
@@ -787,71 +1141,172 @@ const firebaseConfig = {
                         const contact = doc.data();
                         contacts.push(contact);
                     });
-                    renderContacts();
+                    renderContactList();
                 }, (error) => {
                     console.error('Error loading contacts:', error);
                 });
         }
 
-        // Render contacts
-        function renderContacts() {
+        function loadChats() {
+            if (!db || !currentUser) return;
+            
+            // This would load actual chat conversations
+            // For demo, we'll use contacts as chats
+            db.collection('users').doc(currentUser.uid).collection('contacts')
+                .onSnapshot((snapshot) => {
+                    chats = [];
+                    snapshot.forEach((doc) => {
+                        const contact = doc.data();
+                        chats.push({
+                            ...contact,
+                            lastMessage: 'Halo! Mulai percakapan...',
+                            lastMessageTime: new Date()
+                        });
+                    });
+                    renderChatList();
+                });
+        }
+
+        function renderContactList() {
+            if (currentTab !== 'contacts') return;
+            
             contactsList.innerHTML = '';
             
             if (contacts.length === 0) {
-                contactsList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-light);">Belum ada kontak. Tambahkan teman dengan User ID mereka.</div>';
+                contactsList.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: var(--text-light);">
+                        <i class="fas fa-users" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Belum ada kontak. Tambahkan teman dengan User ID mereka.</p>
+                    </div>
+                `;
                 return;
             }
             
-            contacts.forEach(contact => {
+            const filteredContacts = filterContactsBySearch(contacts);
+            
+            filteredContacts.forEach(contact => {
                 const contactItem = document.createElement('div');
-                contactItem.className = 'contact-item';
-                contactItem.dataset.id = contact.userId;
-                
-                if (selectedContact && selectedContact.userId === contact.userId) {
-                    contactItem.classList.add('active');
-                }
-                
+                contactItem.className = 'chat-item';
                 contactItem.innerHTML = `
-                    <div class="contact-avatar">${contact.displayName ? contact.displayName.charAt(0).toUpperCase() : 'F'}</div>
-                    <div class="contact-info">
-                        <div class="contact-name">${contact.displayName || 'Friend'}</div>
-                        <div class="contact-status">${contact.status || 'Online'}</div>
+                    <div class="chat-avatar" style="${contact.photoURL ? `background-image: url(${contact.photoURL})` : ''}">
+                        ${!contact.photoURL ? (contact.displayName ? contact.displayName.charAt(0).toUpperCase() : 'F') : ''}
+                    </div>
+                    <div class="chat-info">
+                        <div class="chat-name">${contact.displayName || 'Friend'}</div>
+                        <div class="chat-last-message">${contact.userId}</div>
+                        <div class="chat-time">Kontak</div>
                     </div>
                 `;
                 
                 contactItem.addEventListener('click', () => {
-                    selectContact(contact);
+                    selectChat(contact);
                 });
                 
                 contactsList.appendChild(contactItem);
             });
         }
 
-        // Select contact
-        function selectContact(contact) {
-            selectedContact = contact;
-            chatHeaderName.textContent = contact.displayName || 'Friend';
-            chatHeaderAvatar.textContent = contact.displayName ? contact.displayName.charAt(0).toUpperCase() : 'F';
-            chatHeaderStatus.textContent = 'Online';
+        function renderChatList() {
+            if (currentTab !== 'chats') return;
             
-            // Update active state in contacts list
-            document.querySelectorAll('.contact-item').forEach(item => {
-                item.classList.remove('active');
-                if (item.dataset.id === contact.userId) {
-                    item.classList.add('active');
+            contactsList.innerHTML = '';
+            
+            if (chats.length === 0) {
+                contactsList.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: var(--text-light);">
+                        <i class="fas fa-comments" style="font-size: 24px; margin-bottom: 10px;"></i>
+                        <p>Belum ada percakapan. Tambahkan teman untuk memulai chat.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const filteredChats = filterContactsBySearch(chats);
+            
+            filteredChats.forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = 'chat-item';
+                if (selectedChat && selectedChat.userId === chat.userId) {
+                    chatItem.classList.add('active');
                 }
+                
+                chatItem.innerHTML = `
+                    <div class="chat-avatar" style="${chat.photoURL ? `background-image: url(${chat.photoURL})` : ''}">
+                        ${!chat.photoURL ? (chat.displayName ? chat.displayName.charAt(0).toUpperCase() : 'F') : ''}
+                    </div>
+                    <div class="chat-info">
+                        <div class="chat-name">${chat.displayName || 'Friend'}</div>
+                        <div class="chat-last-message">${chat.lastMessage}</div>
+                        <div class="chat-time">${formatTime(chat.lastMessageTime)}</div>
+                    </div>
+                `;
+                
+                chatItem.addEventListener('click', () => {
+                    selectChat(chat);
+                });
+                
+                contactsList.appendChild(chatItem);
             });
-            
-            // Load messages for this contact
-            loadMessages(contact.userId);
         }
 
-        // Load messages
+        function filterContactsBySearch(items) {
+            const searchTerm = searchContacts.value.toLowerCase();
+            if (!searchTerm) return items;
+            
+            return items.filter(item => 
+                (item.displayName && item.displayName.toLowerCase().includes(searchTerm)) ||
+                (item.userId && item.userId.toLowerCase().includes(searchTerm))
+            );
+        }
+
+        function filterContacts() {
+            if (currentTab === 'chats') {
+                renderChatList();
+            } else {
+                renderContactList();
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            tabChats.classList.toggle('active', tab === 'chats');
+            tabContacts.classList.toggle('active', tab === 'contacts');
+            
+            if (tab === 'chats') {
+                renderChatList();
+            } else {
+                renderContactList();
+            }
+        }
+
+        function selectChat(chat) {
+            selectedChat = chat;
+            chatHeaderName.textContent = chat.displayName || 'Friend';
+            chatHeaderAvatar.textContent = chat.displayName ? chat.displayName.charAt(0).toUpperCase() : 'F';
+            chatHeaderAvatar.style.backgroundImage = chat.photoURL ? `url(${chat.photoURL})` : '';
+            if (chat.photoURL) chatHeaderAvatar.textContent = '';
+            chatHeaderStatus.textContent = 'Online';
+            
+            // Enable message input
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            messageInput.placeholder = "Ketik pesan...";
+            
+            // Reload lists to update active state
+            if (currentTab === 'chats') {
+                renderChatList();
+            } else {
+                renderContactList();
+            }
+            
+            loadMessages(chat.userId);
+        }
+
         function loadMessages(contactId) {
-            // Clear chat messages
+            if (!db || !currentUser) return;
+            
             chatMessages.innerHTML = '';
             
-            // Load messages from Firestore
             const chatId = [currentUser.uid, contactId].sort().join('_');
             
             db.collection('chats').doc(chatId).collection('messages')
@@ -860,55 +1315,58 @@ const firebaseConfig = {
                     chatMessages.innerHTML = '';
                     snapshot.forEach((doc) => {
                         const message = doc.data();
-                        addMessageToChat(message.text, message.timestamp.toDate(), message.senderId === currentUser.uid ? 'me' : 'other');
+                        addMessageToChat(message);
                     });
                     
-                    // Scroll to bottom
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }, (error) => {
                     console.error('Error loading messages:', error);
                 });
         }
 
-        // Add message to chat
-        function addMessageToChat(text, timestamp, sender) {
+        function addMessageToChat(message) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender === 'me' ? 'message-sent' : 'message-received'}`;
+            const isSent = message.senderId === currentUser.uid;
+            messageDiv.className = `message ${isSent ? 'message-sent' : 'message-received'}`;
             
-            const timeString = `${timestamp.getHours()}:${timestamp.getMinutes().toString().padStart(2, '0')}`;
+            const timeString = formatTime(message.timestamp.toDate());
+            
+            let messageContent = '';
+            if (message.type === 'image') {
+                messageContent = `<img src="${message.imageUrl}" class="message-image" onclick="openImage('${message.imageUrl}')">`;
+            } else {
+                messageContent = `<div class="message-text">${message.text}</div>`;
+            }
             
             messageDiv.innerHTML = `
-                <div class="message-text">${text}</div>
+                ${messageContent}
                 <div class="message-time">${timeString}</div>
             `;
             
             chatMessages.appendChild(messageDiv);
         }
 
-        // Send message
         function sendMessage() {
             const messageText = messageInput.value.trim();
-            if (!messageText || !selectedContact) {
-                alert('Pilih kontak terlebih dahulu atau ketik pesan');
+            if (!messageText || !selectedChat || !db) {
                 return;
             }
             
             const timestamp = new Date();
+            const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
             
-            // Generate chat ID (combination of both user IDs, sorted)
-            const chatId = [currentUser.uid, selectedContact.uid].sort().join('_');
-            
-            // Save message to Firestore
             db.collection('chats').doc(chatId).collection('messages').add({
                 text: messageText,
                 senderId: currentUser.uid,
                 senderName: currentUser.displayName,
                 timestamp: timestamp,
+                type: 'text',
                 read: false
             })
             .then(() => {
-                // Clear input
                 messageInput.value = '';
+                // Update last message in chat list
+                updateLastMessage(selectedChat.userId, messageText, timestamp);
             })
             .catch((error) => {
                 console.error('Error sending message:', error);
@@ -916,9 +1374,68 @@ const firebaseConfig = {
             });
         }
 
-        // Add friend
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file || !selectedChat) return;
+            
+            // Check file size (50MB limit)
+            if (file.size > 50 * 1024 * 1024) {
+                alert('Ukuran file maksimal 50MB');
+                return;
+            }
+            
+            // Check if it's an image
+            if (!file.type.startsWith('image/')) {
+                alert('Hanya file gambar yang diizinkan');
+                return;
+            }
+            
+            loading.style.display = 'flex';
+            
+            const storageRef = storage.ref();
+            const imageRef = storageRef.child(`chat_images/${currentUser.uid}/${Date.now()}_${file.name}`);
+            
+            imageRef.put(file)
+                .then(snapshot => snapshot.ref.getDownloadURL())
+                .then(imageUrl => {
+                    const timestamp = new Date();
+                    const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
+                    
+                    return db.collection('chats').doc(chatId).collection('messages').add({
+                        imageUrl: imageUrl,
+                        senderId: currentUser.uid,
+                        senderName: currentUser.displayName,
+                        timestamp: timestamp,
+                        type: 'image',
+                        read: false
+                    });
+                })
+                .then(() => {
+                    loading.style.display = 'none';
+                    imageInput.value = '';
+                    updateLastMessage(selectedChat.userId, '📷 Gambar', new Date());
+                })
+                .catch(error => {
+                    loading.style.display = 'none';
+                    console.error('Error uploading image:', error);
+                    alert('Gagal mengupload gambar. Silakan coba lagi.');
+                });
+        }
+
+        function handleAddFriend() {
+            const friendId = friendIdInput.value.trim();
+            if (friendId) {
+                addFriend(friendId);
+                friendIdInput.value = '';
+                addFriendModal.style.display = 'none';
+            } else {
+                alert('Masukkan User ID yang valid');
+            }
+        }
+
         function addFriend(friendId) {
-            // Find user by userId
+            if (!db) return;
+            
             db.collection('users').where('userId', '==', friendId).get()
                 .then((snapshot) => {
                     if (snapshot.empty) {
@@ -929,13 +1446,16 @@ const firebaseConfig = {
                     snapshot.forEach((doc) => {
                         const friendData = doc.data();
                         
-                        // Check if already added
                         if (contacts.some(contact => contact.userId === friendId)) {
                             alert('Teman sudah ada di daftar kontak');
                             return;
                         }
                         
-                        // Add to contacts
+                        if (friendData.uid === currentUser.uid) {
+                            alert('Tidak bisa menambahkan diri sendiri');
+                            return;
+                        }
+                        
                         db.collection('users').doc(currentUser.uid).collection('contacts').doc(friendData.uid).set({
                             uid: friendData.uid,
                             userId: friendData.userId,
@@ -946,6 +1466,13 @@ const firebaseConfig = {
                         })
                         .then(() => {
                             alert(`Teman ${friendData.displayName} berhasil ditambahkan!`);
+                            // Add to chats list
+                            chats.push({
+                                ...friendData,
+                                lastMessage: 'Halo! Mulai percakapan...',
+                                lastMessageTime: new Date()
+                            });
+                            renderChatList();
                         })
                         .catch((error) => {
                             console.error('Error adding friend:', error);
@@ -959,21 +1486,101 @@ const firebaseConfig = {
                 });
         }
 
-        // Auth state observer
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                currentUser = user;
-                setupUserProfile();
-                loginPage.style.display = 'none';
-                app.style.display = 'flex';
-                generateUserId();
-                loadContacts();
-            } else {
-                app.style.display = 'none';
-                loginPage.style.display = 'flex';
+        function handleAvatarChange(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.startsWith('image/')) {
+                alert('Hanya file gambar yang diizinkan');
+                return;
             }
-        });
+            
+            loading.style.display = 'flex';
+            
+            const storageRef = storage.ref();
+            const avatarRef = storageRef.child(`avatars/${currentUser.uid}/avatar.jpg`);
+            
+            avatarRef.put(file)
+                .then(snapshot => snapshot.ref.getDownloadURL())
+                .then(avatarUrl => {
+                    return db.collection('users').doc(currentUser.uid).update({
+                        photoURL: avatarUrl
+                    });
+                })
+                .then(() => {
+                    loading.style.display = 'none';
+                    userAvatar.style.backgroundImage = `url(${avatarUrl})`;
+                    userAvatar.textContent = '';
+                    profileAvatarPreview.style.backgroundImage = `url(${avatarUrl})`;
+                    profileAvatarPreview.textContent = '';
+                    alert('Foto profil berhasil diubah!');
+                })
+                .catch(error => {
+                    loading.style.display = 'none';
+                    console.error('Error uploading avatar:', error);
+                    alert('Gagal mengubah foto profil. Silakan coba lagi.');
+                });
+        }
+
+        function saveProfile() {
+            const newName = profileNameInput.value.trim();
+            if (!newName) {
+                alert('Masukkan nama panggilan');
+                return;
+            }
+            
+            db.collection('users').doc(currentUser.uid).update({
+                displayName: newName
+            })
+            .then(() => {
+                userName.textContent = newName;
+                userAvatar.textContent = newName.charAt(0).toUpperCase();
+                alert('Profil berhasil diperbarui!');
+                profileModal.style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error updating profile:', error);
+                alert('Gagal memperbarui profil. Silakan coba lagi.');
+            });
+        }
+
+        function updateLastMessage(contactId, message, timestamp) {
+            const chatIndex = chats.findIndex(chat => chat.userId === contactId);
+            if (chatIndex !== -1) {
+                chats[chatIndex].lastMessage = message;
+                chats[chatIndex].lastMessageTime = timestamp;
+                renderChatList();
+            }
+        }
+
+        function formatTime(date) {
+            return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        }
+
+        function openImage(url) {
+            window.open(url, '_blank');
+        }
+
+        // Auth state observer
+        if (auth) {
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUser = user;
+                    setupUserProfile();
+                    loginPage.style.display = 'none';
+                    app.style.display = 'flex';
+                    generateUserId();
+                    loadContacts();
+                    loadChats();
+                } else {
+                    app.style.display = 'none';
+                    loginPage.style.display = 'flex';
+                    contacts = [];
+                    chats = [];
+                    selectedChat = null;
+                }
+            });
+        }
     </script>
 </body>
 </html>
-
