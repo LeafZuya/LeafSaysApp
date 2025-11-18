@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <style>
+        /* CSS tetap sama seperti sebelumnya */
         :root {
             --primary-green: #128C7E;
             --light-green: #25D366;
@@ -1000,6 +1001,7 @@
         let userData = null;
         let auth, db, storage;
         let currentTab = 'chats';
+        let unsubscribeMessages = null;
 
         // Initialize Firebase
         function initializeFirebase() {
@@ -1373,7 +1375,7 @@
                 renderContactList();
             }
             
-            loadMessages(chat.userId);
+            loadMessages(chat.uid);
         }
 
         function loadMessages(contactId) {
@@ -1382,7 +1384,12 @@
                 return;
             }
             
-            console.log('Loading messages for:', contactId);
+            console.log('Loading messages for contact:', contactId);
+            
+            // Unsubscribe from previous listener
+            if (unsubscribeMessages) {
+                unsubscribeMessages();
+            }
             
             // Clear chat messages dan tampilkan loading
             chatMessages.innerHTML = `
@@ -1392,47 +1399,68 @@
                 </div>
             `;
             
+            // Create chat ID (sorted to ensure consistency)
             const chatId = [currentUser.uid, contactId].sort().join('_');
             console.log('Chat ID:', chatId);
             
-            // Listen untuk messages real-time
-            db.collection('chats').doc(chatId).collection('messages')
-                .orderBy('timestamp', 'asc')
-                .onSnapshot((snapshot) => {
-                    console.log('Messages snapshot:', snapshot.size, 'messages');
-                    
-                    chatMessages.innerHTML = '';
-                    
-                    if (snapshot.empty) {
-                        // Jika belum ada pesan, tampilkan pesan default
+            // Create chat document if it doesn't exist
+            db.collection('chats').doc(chatId).set({
+                participants: [currentUser.uid, contactId],
+                lastMessage: '',
+                lastMessageTime: new Date(),
+                createdAt: new Date()
+            }, { merge: true })
+            .then(() => {
+                console.log('Chat document created/verified');
+                
+                // Listen untuk messages real-time
+                unsubscribeMessages = db.collection('chats').doc(chatId).collection('messages')
+                    .orderBy('timestamp', 'asc')
+                    .onSnapshot((snapshot) => {
+                        console.log('Messages snapshot:', snapshot.size, 'messages');
+                        
+                        chatMessages.innerHTML = '';
+                        
+                        if (snapshot.empty) {
+                            // Jika belum ada pesan, tampilkan pesan default
+                            chatMessages.innerHTML = `
+                                <div class="chat-empty">
+                                    <i class="fas fa-comments"></i>
+                                    <h3 style="margin-bottom: 10px;">Mulai Percakapan</h3>
+                                    <p>Kirim pesan pertama untuk memulai chat dengan ${selectedChat?.displayName || 'teman'}!</p>
+                                </div>
+                            `;
+                            return;
+                        }
+                        
+                        snapshot.forEach((doc) => {
+                            const message = doc.data();
+                            addMessageToChat(message);
+                        });
+                        
+                        // Scroll ke bottom
+                        setTimeout(() => {
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }, 100);
+                    }, (error) => {
+                        console.error('Error loading messages:', error);
                         chatMessages.innerHTML = `
-                            <div class="chat-empty">
-                                <i class="fas fa-comments"></i>
-                                <h3 style="margin-bottom: 10px;">Mulai Percakapan</h3>
-                                <p>Kirim pesan pertama untuk memulai chat dengan ${selectedChat?.displayName || 'teman'}!</p>
+                            <div style="text-align: center; padding: 20px; color: #c62828;">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <p>Gagal memuat pesan. Silakan refresh halaman.</p>
                             </div>
                         `;
-                        return;
-                    }
-                    
-                    snapshot.forEach((doc) => {
-                        const message = doc.data();
-                        addMessageToChat(message);
                     });
-                    
-                    // Scroll ke bottom
-                    setTimeout(() => {
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    }, 100);
-                }, (error) => {
-                    console.error('Error loading messages:', error);
-                    chatMessages.innerHTML = `
-                        <div style="text-align: center; padding: 20px; color: #c62828;">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            <p>Gagal memuat pesan. Silakan refresh halaman.</p>
-                        </div>
-                    `;
-                });
+            })
+            .catch((error) => {
+                console.error('Error creating chat document:', error);
+                chatMessages.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #c62828;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Gagal memulai percakapan. Silakan coba lagi.</p>
+                    </div>
+                `;
+            });
         }
 
         function addMessageToChat(message) {
@@ -1464,7 +1492,7 @@
                 return;
             }
             
-            console.log('Sending message to:', selectedChat.userId);
+            console.log('Sending message to:', selectedChat.uid);
             
             const timestamp = new Date();
             const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
@@ -1482,8 +1510,14 @@
                 console.log('Message sent successfully');
                 messageInput.value = '';
                 
+                // Update last message di chat document
+                db.collection('chats').doc(chatId).update({
+                    lastMessage: messageText,
+                    lastMessageTime: timestamp
+                });
+                
                 // Update last message di chat list
-                updateLastMessage(selectedChat.userId, messageText, timestamp);
+                updateLastMessage(selectedChat.uid, messageText, timestamp);
                 
                 // Auto scroll ke bottom
                 setTimeout(() => {
@@ -1535,7 +1569,15 @@
                 .then(() => {
                     loading.style.display = 'none';
                     imageInput.value = '';
-                    updateLastMessage(selectedChat.userId, '📷 Gambar', new Date());
+                    
+                    // Update last message
+                    const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
+                    db.collection('chats').doc(chatId).update({
+                        lastMessage: '📷 Gambar',
+                        lastMessageTime: new Date()
+                    });
+                    
+                    updateLastMessage(selectedChat.uid, '📷 Gambar', new Date());
                 })
                 .catch(error => {
                     loading.style.display = 'none';
@@ -1667,7 +1709,7 @@
         }
 
         function updateLastMessage(contactId, message, timestamp) {
-            const chatIndex = chats.findIndex(chat => chat.userId === contactId);
+            const chatIndex = chats.findIndex(chat => chat.uid === contactId);
             if (chatIndex !== -1) {
                 chats[chatIndex].lastMessage = message;
                 chats[chatIndex].lastMessageTime = timestamp;
@@ -1713,6 +1755,12 @@
                     contacts = [];
                     chats = [];
                     selectedChat = null;
+                    
+                    // Unsubscribe from messages when logging out
+                    if (unsubscribeMessages) {
+                        unsubscribeMessages();
+                        unsubscribeMessages = null;
+                    }
                 }
             });
         }
