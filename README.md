@@ -10,7 +10,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <style>
-        /* CSS tetap sama seperti sebelumnya */
         :root {
             --primary-green: #128C7E;
             --light-green: #25D366;
@@ -113,9 +112,11 @@
             margin-bottom: 20px;
         }
         
-        .logo-icon {
-            font-size: 36px;
-            color: var(--primary-green);
+        .logo-img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
             margin-right: 10px;
         }
         
@@ -200,8 +201,11 @@
             gap: 10px;
         }
         
-        .app-logo-icon {
-            font-size: 24px;
+        .app-logo-img {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            object-fit: cover;
         }
         
         .app-logo-text {
@@ -648,6 +652,15 @@
             background-color: var(--dark-green);
         }
         
+        .modal-btn.logout {
+            background-color: #f44336;
+            margin-top: 10px;
+        }
+        
+        .modal-btn.logout:hover {
+            background-color: #d32f2f;
+        }
+        
         /* Profile Settings */
         .profile-avatar {
             width: 100px;
@@ -801,7 +814,7 @@
     <div id="login-page">
         <div class="login-container">
             <div class="logo">
-                <i class="fas fa-leaf logo-icon"></i>
+                <img src="https://images.unsplash.com/photo-1568667256549-094345857637?w=100&h=100&fit=crop&crop=center" alt="LeafSays Logo" class="logo-img">
                 <div class="logo-text">LeafSays</div>
             </div>
             <h1>Selamat Datang di LeafSays</h1>
@@ -827,7 +840,7 @@
                 <i class="fas fa-arrow-left"></i>
             </button>
             <div class="app-logo">
-                <i class="fas fa-leaf app-logo-icon"></i>
+                <img src="LeafS.jpg" alt="LeafSays Logo" class="app-logo-img">
                 <div class="app-logo-text">LeafSays</div>
             </div>
             <div class="user-info">
@@ -868,10 +881,16 @@
             <!-- Chat Area -->
             <div class="chat-area">
                 <div class="chat-header">
+                    <button class="mobile-back-btn" id="chat-back-btn" style="display: none;">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
                     <div class="chat-header-avatar" id="chat-header-avatar">L</div>
                     <div class="chat-header-info">
                         <div class="chat-header-name" id="chat-header-name">LeafSays Chat</div>
                         <div class="chat-header-status" id="chat-header-status">Pilih chat untuk memulai percakapan</div>
+                    </div>
+                    <div class="header-actions">
+                        <i class="fas fa-times" id="close-chat-btn" title="Keluar Chat" style="display: none;"></i>
                     </div>
                 </div>
                 
@@ -942,6 +961,14 @@
                 <button class="modal-btn" id="save-profile-btn">
                     <i class="fas fa-save"></i> Simpan Perubahan
                 </button>
+                
+                <button class="modal-btn logout" id="switch-account-btn">
+                    <i class="fas fa-sync-alt"></i> Ganti Akun
+                </button>
+                
+                <button class="modal-btn logout" id="logout-profile-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
             </div>
         </div>
     </div>
@@ -968,6 +995,8 @@
         const addFriendBtn = document.getElementById('add-friend-btn');
         const settingsBtn = document.getElementById('settings-btn');
         const mobileBackBtn = document.getElementById('mobile-back-btn');
+        const chatBackBtn = document.getElementById('chat-back-btn');
+        const closeChatBtn = document.getElementById('close-chat-btn');
         const addFriendModal = document.getElementById('add-friend-modal');
         const profileModal = document.getElementById('profile-modal');
         const closeModals = document.querySelectorAll('.close-modal');
@@ -989,6 +1018,8 @@
         const avatarInput = document.getElementById('avatar-input');
         const profileNameInput = document.getElementById('profile-name-input');
         const saveProfileBtn = document.getElementById('save-profile-btn');
+        const switchAccountBtn = document.getElementById('switch-account-btn');
+        const logoutProfileBtn = document.getElementById('logout-profile-btn');
         const searchContacts = document.getElementById('search-contacts');
         const tabChats = document.getElementById('tab-chats');
         const tabContacts = document.getElementById('tab-contacts');
@@ -1059,11 +1090,15 @@
         addFriendBtn.addEventListener('click', () => addFriendModal.style.display = 'flex');
         settingsBtn.addEventListener('click', () => profileModal.style.display = 'flex');
         mobileBackBtn.addEventListener('click', handleMobileBack);
+        chatBackBtn.addEventListener('click', handleCloseChat);
+        closeChatBtn.addEventListener('click', handleCloseChat);
         addFriendConfirm.addEventListener('click', handleAddFriend);
         sendBtn.addEventListener('click', sendMessage);
         attachBtn.addEventListener('click', () => imageInput.click());
         imageInput.addEventListener('change', handleImageUpload);
         saveProfileBtn.addEventListener('click', saveProfile);
+        switchAccountBtn.addEventListener('click', handleSwitchAccount);
+        logoutProfileBtn.addEventListener('click', handleLogout);
         searchContacts.addEventListener('input', filterContacts);
         
         tabChats.addEventListener('click', () => switchTab('chats'));
@@ -1104,6 +1139,12 @@
             hideError();
             
             const provider = new firebase.auth.GoogleAuthProvider();
+            
+            // Tambahkan ini untuk login yang lebih mudah
+            provider.setCustomParameters({
+                prompt: 'select_account'
+            });
+            
             provider.addScope('profile');
             provider.addScope('email');
             
@@ -1122,7 +1163,13 @@
                 .catch((error) => {
                     loading.style.display = 'none';
                     console.error('Login error:', error);
-                    showError('Login gagal: ' + error.message);
+                    
+                    // Jika popup diblokir, coba redirect
+                    if (error.code === 'auth/popup-blocked') {
+                        auth.signInWithRedirect(provider);
+                    } else {
+                        showError('Login gagal: ' + error.message);
+                    }
                 });
         }
 
@@ -1132,10 +1179,71 @@
             }
         }
 
+        function handleSwitchAccount() {
+            if (auth) {
+                // Tutup modal profile dulu
+                profileModal.style.display = 'none';
+                
+                // Logout dan login ulang dengan pilih akun
+                auth.signOut().then(() => {
+                    setTimeout(() => {
+                        handleLogin();
+                    }, 500);
+                });
+            }
+        }
+
         function handleMobileBack() {
             document.querySelector('.sidebar').style.display = 'flex';
             document.querySelector('.chat-area').classList.remove('active');
             mobileBackBtn.style.display = 'none';
+        }
+
+        function handleCloseChat() {
+            selectedChat = null;
+            chatHeaderName.textContent = 'LeafSays Chat';
+            chatHeaderAvatar.textContent = 'L';
+            chatHeaderAvatar.style.backgroundImage = '';
+            chatHeaderStatus.textContent = 'Pilih chat untuk memulai percakapan';
+            
+            // Disable message input
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            messageInput.placeholder = "Pilih chat terlebih dahulu";
+            messageInput.value = '';
+            
+            // Clear chat messages
+            chatMessages.innerHTML = `
+                <div class="message message-received">
+                    <div class="message-text">Selamat datang di LeafSays! 🌿</div>
+                    <div class="message-text" style="margin-top: 5px;">Pilih chat dari daftar untuk memulai percakapan real-time.</div>
+                    <div class="message-time">Sekarang</div>
+                </div>
+            `;
+            
+            // Hide close chat button
+            closeChatBtn.style.display = 'none';
+            chatBackBtn.style.display = 'none';
+            
+            // Show sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.querySelector('.sidebar').style.display = 'flex';
+                document.querySelector('.chat-area').classList.remove('active');
+                mobileBackBtn.style.display = 'none';
+            }
+            
+            // Unsubscribe from messages
+            if (unsubscribeMessages) {
+                unsubscribeMessages();
+                unsubscribeMessages = null;
+            }
+            
+            // Reload lists to update active state
+            if (currentTab === 'chats') {
+                renderChatList();
+            } else {
+                renderContactList();
+            }
         }
 
         function setupUserProfile() {
@@ -1372,11 +1480,15 @@
             messageInput.placeholder = "Ketik pesan...";
             messageInput.focus();
             
+            // Show close chat button
+            closeChatBtn.style.display = 'block';
+            
             // Update mobile view
             if (window.innerWidth <= 768) {
                 document.querySelector('.sidebar').style.display = 'none';
                 document.querySelector('.chat-area').classList.add('active');
                 mobileBackBtn.style.display = 'block';
+                chatBackBtn.style.display = 'block';
             }
             
             // Reload lists to update active state
@@ -1535,9 +1647,9 @@
             const file = event.target.files[0];
             if (!file || !selectedChat) return;
             
-            // Check file size (50MB limit)
-            if (file.size > 50 * 1024 * 1024) {
-                alert('Ukuran file maksimal 50MB');
+            // Check file size (5MB limit - diperkecil dari 50MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Ukuran file maksimal 5MB');
                 return;
             }
             
@@ -1552,42 +1664,59 @@
             const storageRef = storage.ref();
             const imageRef = storageRef.child(`chat_images/${currentUser.uid}/${Date.now()}_${file.name}`);
             
-            imageRef.put(file)
-                .then(snapshot => snapshot.ref.getDownloadURL())
-                .then(imageUrl => {
-                    const timestamp = new Date();
-                    const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
-                    
-                    return db.collection('chats').doc(chatId).collection('messages').add({
-                        imageUrl: imageUrl,
-                        senderId: currentUser.uid,
-                        senderName: currentUser.displayName,
-                        timestamp: timestamp,
-                        type: 'image',
-                        read: false
-                    });
-                })
-                .then(() => {
-                    loading.style.display = 'none';
-                    imageInput.value = '';
-                    
-                    // Update last message
-                    const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
-                    const timestamp = new Date();
-                    db.collection('chats').doc(chatId).set({
-                        lastMessage: '📷 Gambar',
-                        lastMessageTime: timestamp,
-                        participants: [currentUser.uid, selectedChat.uid],
-                        updatedAt: timestamp
-                    }, { merge: true });
-                    
-                    updateLastMessage(selectedChat.uid, '📷 Gambar', timestamp);
-                })
-                .catch(error => {
+            // Upload dengan progress indicator
+            const uploadTask = imageRef.put(file);
+            
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    // Progress tracking
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    console.log('Upload progress: ' + progress + '%');
+                },
+                (error) => {
                     loading.style.display = 'none';
                     console.error('Error uploading image:', error);
                     alert('Gagal mengupload gambar: ' + error.message);
-                });
+                },
+                () => {
+                    // Upload completed successfully
+                    uploadTask.snapshot.ref.getDownloadURL()
+                    .then((imageUrl) => {
+                        const timestamp = new Date();
+                        const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
+                        
+                        return db.collection('chats').doc(chatId).collection('messages').add({
+                            imageUrl: imageUrl,
+                            senderId: currentUser.uid,
+                            senderName: currentUser.displayName,
+                            timestamp: timestamp,
+                            type: 'image',
+                            read: false
+                        });
+                    })
+                    .then(() => {
+                        loading.style.display = 'none';
+                        imageInput.value = '';
+                        
+                        // Update last message
+                        const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
+                        const timestamp = new Date();
+                        db.collection('chats').doc(chatId).set({
+                            lastMessage: '📷 Gambar',
+                            lastMessageTime: timestamp,
+                            participants: [currentUser.uid, selectedChat.uid],
+                            updatedAt: timestamp
+                        }, { merge: true });
+                        
+                        updateLastMessage(selectedChat.uid, '📷 Gambar', timestamp);
+                    })
+                    .catch(error => {
+                        loading.style.display = 'none';
+                        console.error('Error adding image message:', error);
+                        alert('Gagal mengirim gambar: ' + error.message);
+                    });
+                }
+            );
         }
 
         function handleAddFriend() {
@@ -1660,6 +1789,12 @@
             
             if (!file.type.startsWith('image/')) {
                 alert('Hanya file gambar yang diizinkan');
+                return;
+            }
+            
+            // Check file size (2MB limit untuk avatar)
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Ukuran file maksimal 2MB untuk foto profil');
                 return;
             }
             
@@ -1758,6 +1893,7 @@
         if (auth) {
             auth.onAuthStateChanged((user) => {
                 if (user) {
+                    console.log('User automatically logged in:', user);
                     currentUser = user;
                     setupUserProfile();
                     loginPage.style.display = 'none';
@@ -1766,6 +1902,7 @@
                     loadContacts();
                     loadChats();
                 } else {
+                    console.log('No user logged in');
                     app.style.display = 'none';
                     loginPage.style.display = 'flex';
                     contacts = [];
