@@ -1013,6 +1013,11 @@
                 db = firebase.firestore();
                 storage = firebase.storage();
                 
+                // Set Firestore settings untuk development
+                db.settings({
+                    experimentalForceLongPolling: true
+                });
+                
                 console.log('Firebase initialized successfully');
                 hideError();
                 return true;
@@ -1189,7 +1194,13 @@
                             createdAt: new Date()
                         };
                         
-                        db.collection('users').doc(currentUser.uid).set(userData);
+                        db.collection('users').doc(currentUser.uid).set(userData)
+                        .then(() => {
+                            console.log('User data created successfully');
+                        })
+                        .catch(error => {
+                            console.error('Error creating user data:', error);
+                        });
                     }
                 })
                 .catch((error) => {
@@ -1437,7 +1448,8 @@
                     chatMessages.innerHTML = `
                         <div style="text-align: center; padding: 20px; color: #c62828;">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <p>Gagal memuat pesan. Silakan refresh halaman.</p>
+                            <p>Gagal memuat pesan: ${error.message}</p>
+                            <p style="font-size: 12px; margin-top: 10px;">Pastikan Firestore Rules sudah diatur dengan benar</p>
                         </div>
                     `;
                 });
@@ -1477,17 +1489,24 @@
             const timestamp = new Date();
             const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
             
-            // Tambahkan pesan ke Firestore
-            db.collection('chats').doc(chatId).collection('messages').add({
+            console.log('Chat ID for sending:', chatId);
+            
+            // Buat data pesan
+            const messageData = {
                 text: messageText,
                 senderId: currentUser.uid,
                 senderName: currentUser.displayName || 'User',
                 timestamp: timestamp,
                 type: 'text',
                 read: false
-            })
-            .then(() => {
-                console.log('Message sent successfully');
+            };
+            
+            console.log('Message data:', messageData);
+            
+            // Tambahkan pesan ke Firestore
+            db.collection('chats').doc(chatId).collection('messages').add(messageData)
+            .then((docRef) => {
+                console.log('Message sent successfully with ID:', docRef.id);
                 messageInput.value = '';
                 
                 // Update last message di chat document
@@ -1508,7 +1527,7 @@
             })
             .catch((error) => {
                 console.error('Error sending message:', error);
-                alert('Gagal mengirim pesan. Silakan coba lagi.');
+                alert('Gagal mengirim pesan: ' + error.message);
             });
         }
 
@@ -1567,7 +1586,7 @@
                 .catch(error => {
                     loading.style.display = 'none';
                     console.error('Error uploading image:', error);
-                    alert('Gagal mengupload gambar. Silakan coba lagi.');
+                    alert('Gagal mengupload gambar: ' + error.message);
                 });
         }
 
@@ -1625,13 +1644,13 @@
                         })
                         .catch((error) => {
                             console.error('Error adding friend:', error);
-                            alert('Gagal menambahkan teman. Silakan coba lagi.');
+                            alert('Gagal menambahkan teman: ' + error.message);
                         });
                     });
                 })
                 .catch((error) => {
                     console.error('Error finding user:', error);
-                    alert('Terjadi kesalahan. Silakan coba lagi.');
+                    alert('Terjadi kesalahan: ' + error.message);
                 });
         }
 
@@ -1667,7 +1686,7 @@
                 .catch(error => {
                     loading.style.display = 'none';
                     console.error('Error uploading avatar:', error);
-                    alert('Gagal mengubah foto profil. Silakan coba lagi.');
+                    alert('Gagal mengubah foto profil: ' + error.message);
                 });
         }
 
@@ -1689,7 +1708,7 @@
             })
             .catch(error => {
                 console.error('Error updating profile:', error);
-                alert('Gagal memperbarui profil. Silakan coba lagi.');
+                alert('Gagal memperbarui profil: ' + error.message);
             });
         }
 
@@ -1718,6 +1737,18 @@
             console.log('Contacts:', contacts);
             console.log('Chats:', chats);
             console.log('Firebase DB:', db ? 'Connected' : 'Not connected');
+            
+            // Test creating a simple document
+            if (db && currentUser) {
+                db.collection('test').doc('test_doc').set({
+                    test: 'Hello World',
+                    timestamp: new Date()
+                }).then(() => {
+                    console.log('Test document created successfully');
+                }).catch(error => {
+                    console.error('Error creating test document:', error);
+                });
+            }
         }
 
         // Expose test function ke global scope untuk debugging
