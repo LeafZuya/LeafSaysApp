@@ -1403,64 +1403,44 @@
             const chatId = [currentUser.uid, contactId].sort().join('_');
             console.log('Chat ID:', chatId);
             
-            // Create chat document if it doesn't exist
-            db.collection('chats').doc(chatId).set({
-                participants: [currentUser.uid, contactId],
-                lastMessage: '',
-                lastMessageTime: new Date(),
-                createdAt: new Date()
-            }, { merge: true })
-            .then(() => {
-                console.log('Chat document created/verified');
-                
-                // Listen untuk messages real-time
-                unsubscribeMessages = db.collection('chats').doc(chatId).collection('messages')
-                    .orderBy('timestamp', 'asc')
-                    .onSnapshot((snapshot) => {
-                        console.log('Messages snapshot:', snapshot.size, 'messages');
-                        
-                        chatMessages.innerHTML = '';
-                        
-                        if (snapshot.empty) {
-                            // Jika belum ada pesan, tampilkan pesan default
-                            chatMessages.innerHTML = `
-                                <div class="chat-empty">
-                                    <i class="fas fa-comments"></i>
-                                    <h3 style="margin-bottom: 10px;">Mulai Percakapan</h3>
-                                    <p>Kirim pesan pertama untuk memulai chat dengan ${selectedChat?.displayName || 'teman'}!</p>
-                                </div>
-                            `;
-                            return;
-                        }
-                        
-                        snapshot.forEach((doc) => {
-                            const message = doc.data();
-                            addMessageToChat(message);
-                        });
-                        
-                        // Scroll ke bottom
-                        setTimeout(() => {
-                            chatMessages.scrollTop = chatMessages.scrollHeight;
-                        }, 100);
-                    }, (error) => {
-                        console.error('Error loading messages:', error);
+            // Listen untuk messages real-time
+            unsubscribeMessages = db.collection('chats').doc(chatId).collection('messages')
+                .orderBy('timestamp', 'asc')
+                .onSnapshot((snapshot) => {
+                    console.log('Messages snapshot:', snapshot.size, 'messages');
+                    
+                    chatMessages.innerHTML = '';
+                    
+                    if (snapshot.empty) {
+                        // Jika belum ada pesan, tampilkan pesan default
                         chatMessages.innerHTML = `
-                            <div style="text-align: center; padding: 20px; color: #c62828;">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <p>Gagal memuat pesan. Silakan refresh halaman.</p>
+                            <div class="chat-empty">
+                                <i class="fas fa-comments"></i>
+                                <h3 style="margin-bottom: 10px;">Mulai Percakapan</h3>
+                                <p>Kirim pesan pertama untuk memulai chat dengan ${selectedChat?.displayName || 'teman'}!</p>
                             </div>
                         `;
+                        return;
+                    }
+                    
+                    snapshot.forEach((doc) => {
+                        const message = doc.data();
+                        addMessageToChat(message);
                     });
-            })
-            .catch((error) => {
-                console.error('Error creating chat document:', error);
-                chatMessages.innerHTML = `
-                    <div style="text-align: center; padding: 20px; color: #c62828;">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p>Gagal memulai percakapan. Silakan coba lagi.</p>
-                    </div>
-                `;
-            });
+                    
+                    // Scroll ke bottom
+                    setTimeout(() => {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }, 100);
+                }, (error) => {
+                    console.error('Error loading messages:', error);
+                    chatMessages.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #c62828;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Gagal memuat pesan. Silakan refresh halaman.</p>
+                        </div>
+                    `;
+                });
         }
 
         function addMessageToChat(message) {
@@ -1511,10 +1491,12 @@
                 messageInput.value = '';
                 
                 // Update last message di chat document
-                db.collection('chats').doc(chatId).update({
+                db.collection('chats').doc(chatId).set({
                     lastMessage: messageText,
-                    lastMessageTime: timestamp
-                });
+                    lastMessageTime: timestamp,
+                    participants: [currentUser.uid, selectedChat.uid],
+                    updatedAt: timestamp
+                }, { merge: true });
                 
                 // Update last message di chat list
                 updateLastMessage(selectedChat.uid, messageText, timestamp);
@@ -1572,12 +1554,15 @@
                     
                     // Update last message
                     const chatId = [currentUser.uid, selectedChat.uid].sort().join('_');
-                    db.collection('chats').doc(chatId).update({
+                    const timestamp = new Date();
+                    db.collection('chats').doc(chatId).set({
                         lastMessage: '📷 Gambar',
-                        lastMessageTime: new Date()
-                    });
+                        lastMessageTime: timestamp,
+                        participants: [currentUser.uid, selectedChat.uid],
+                        updatedAt: timestamp
+                    }, { merge: true });
                     
-                    updateLastMessage(selectedChat.uid, '📷 Gambar', new Date());
+                    updateLastMessage(selectedChat.uid, '📷 Gambar', timestamp);
                 })
                 .catch(error => {
                     loading.style.display = 'none';
