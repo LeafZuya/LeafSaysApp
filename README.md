@@ -814,7 +814,7 @@
     <div id="login-page">
         <div class="login-container">
             <div class="logo">
-                <img src="https://images.unsplash.com/photo-1568667256549-094345857637?w=100&h=100&fit=crop&crop=center" alt="LeafSays Logo" class="logo-img">
+                <img src="LeafS.jpg" alt="LeafSays Logo" class="logo-img">
                 <div class="logo-text">LeafSays</div>
             </div>
             <h1>Selamat Datang di LeafSays</h1>
